@@ -1,0 +1,308 @@
+// ============================================
+// TRUCKCONNECT - PRISMA SCHEMA (INTEGER IDs)
+// ============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum BusinessType {
+  SHIPPER
+  TRUCK_OWNER
+  TRANSPORTER
+}
+
+enum LoadStatus {
+  AVAILABLE
+  BOOKED
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+enum TruckStatus {
+  AVAILABLE
+  ON_TRIP
+  MAINTENANCE
+  UNAVAILABLE
+}
+
+enum TruckType {
+  OPEN
+  CONTAINER
+  TRAILER
+  FLATBED
+  REFRIGERATED
+  TANKER
+}
+
+enum RequestInitiator {
+  SHIPPER
+  CARRIER
+}
+
+enum BookingStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+// ============================================================
+// ADDRESS
+// ============================================================
+
+model Address {
+  id           Int     @id @default(autoincrement())
+  addressLine1 String  @db.VarChar(255)
+  addressLine2 String? @db.VarChar(255)
+  area         String? @db.VarChar(100)
+  landmark     String? @db.VarChar(100)
+  city         String  @db.VarChar(50)
+  district     String? @db.VarChar(50)
+  state        String  @db.VarChar(50)
+  pinCode      String  @db.VarChar(10)
+  country      String  @default("India") @db.VarChar(50)
+
+  latitude  Float?
+  longitude Float?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  users     User[]
+  companies Company[]
+
+  @@index([pinCode])
+  @@index([city, state])
+  @@map("addresses")
+}
+
+// ============================================================
+// USER (Authentication & Profile)
+// ============================================================
+
+model User {
+  id           Int          @id @default(autoincrement())
+  fullName     String       @db.VarChar(100)
+  email        String       @unique @db.VarChar(255)
+  mobile       String       @unique @db.VarChar(15)
+  password     String       @db.VarChar(255)
+  role         Role         @default(USER)
+  businessType BusinessType
+
+  addressId Int?
+  address   Address? @relation(fields: [addressId], references: [id], onDelete: SetNull)
+
+  companyId Int?     @map("company_id")
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  loads           Load[]
+  trucks          Truck[]
+  shipperBookings Booking[] @relation("ShipperBookings")
+  carrierBookings Booking[] @relation("CarrierBookings")
+
+  @@index([email])
+  @@index([role])
+  @@index([businessType])
+  @@index([addressId])
+  @@index([companyId])
+  @@map("users")
+}
+
+// ============================================================
+// COMPANY
+// ============================================================
+
+model Company {
+  id          Int     @id @default(autoincrement())
+  companyName String  @map("company_name") @db.VarChar(100)
+  gstNumber   String? @map("gst_number") @db.VarChar(15)
+  phone       String  @db.VarChar(15)
+  email       String  @db.VarChar(255)
+  description String? @db.Text
+
+  addressId Int     @map("address_id")
+  address   Address @relation(fields: [addressId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  users User[]
+
+  @@index([companyName])
+  @@map("companies")
+}
+
+// ============================================================
+// LOAD
+// ============================================================
+
+model Load {
+  id           Int       @id @default(autoincrement())
+  materialType String    @db.VarChar(100)
+  weight       Decimal   @db.Decimal(10, 2)
+  truckType    TruckType
+  pickupDate   DateTime  @map("pickup_date")
+
+  pickupCity  String @map("pickup_city") @db.VarChar(50)
+  pickupState String @map("pickup_state") @db.VarChar(50)
+  dropCity    String @map("drop_city") @db.VarChar(50)
+  dropState   String @map("drop_state") @db.VarChar(50)
+
+  contactName   String  @map("contact_name") @db.VarChar(100)
+  contactNumber String  @map("contact_number") @db.VarChar(15)
+  companyName   String? @map("company_name") @db.VarChar(100)
+  email         String? @db.VarChar(255)
+
+  status LoadStatus @default(AVAILABLE)
+
+  userId Int  @map("user_id")
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  pickupAddress Json @map("pickup_address")
+  dropAddress   Json @map("drop_address")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  bookings Booking[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([pickupDate])
+  @@index([truckType])
+  @@index([pickupCity, dropCity])
+  @@map("loads")
+}
+
+// ============================================================
+// TRUCK
+// ============================================================
+
+model Truck {
+  id               Int       @id @default(autoincrement())
+  truckNumber      String    @unique @map("truck_number") @db.VarChar(20)
+  truckType        TruckType @map("truck_type")
+  capacity         Decimal   @db.Decimal(10, 2)
+  availableRoutes  String[]  @map("available_routes")
+  availabilityDate DateTime  @map("availability_date")
+
+  ownerName     String      @map("owner_name") @db.VarChar(100)
+  contactNumber String      @map("contact_number") @db.VarChar(15)
+  status        TruckStatus @default(AVAILABLE)
+
+  userId Int  @map("user_id")
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  currentLocation Json @map("current_location")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  bookings Booking[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([truckType])
+  @@index([availabilityDate])
+  @@map("trucks")
+}
+
+// ============================================================
+// BOOKING
+// ============================================================
+
+model Booking {
+  id Int @id @default(autoincrement())
+
+  loadId Int  @map("load_id")
+  load   Load @relation(fields: [loadId], references: [id], onDelete: Cascade)
+
+  truckId Int   @map("truck_id")
+  truck   Truck @relation(fields: [truckId], references: [id], onDelete: Cascade)
+
+  shipperId Int  @map("shipper_id")
+  shipper   User @relation("ShipperBookings", fields: [shipperId], references: [id])
+
+  carrierId Int  @map("carrier_id")
+  carrier   User @relation("CarrierBookings", fields: [carrierId], references: [id])
+
+  initiatedBy RequestInitiator @map("initiated_by")
+  status      BookingStatus    @default(PENDING)
+
+  agreedPrice Decimal? @map("agreed_price") @db.Decimal(10, 2)
+  notes       String?  @db.VarChar(255)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([loadId])
+  @@index([truckId])
+  @@index([shipperId])
+  @@index([carrierId])
+  @@index([status])
+  @@map("bookings")
+}
+
+// ============================================================
+// CMS & SUPPORT
+// ============================================================
+
+model Blog {
+  id          Int     @id @default(autoincrement())
+  title       String  @db.VarChar(255)
+  content     String  @db.Text
+  isPublished Boolean @default(true) @map("is_published")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([createdAt])
+  @@index([isPublished])
+  @@map("blogs")
+}
+
+model Faq {
+  id       Int    @id @default(autoincrement())
+  question String @db.VarChar(255)
+  answer   String @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("faqs")
+}
+
+model ContactMessage {
+  id      Int     @id @default(autoincrement())
+  name    String  @db.VarChar(100)
+  email   String  @db.VarChar(255)
+  mobile  String  @db.VarChar(15)
+  message String  @db.Text
+  isRead  Boolean @default(false) @map("is_read")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([isRead])
+  @@map("contact_messages")
+}
