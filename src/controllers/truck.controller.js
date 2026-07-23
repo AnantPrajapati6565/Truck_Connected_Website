@@ -37,6 +37,7 @@ const createTruck = async (req, res) => {
       return error(res, 'Truck number already exists', 400);
     }
 
+    // ✅ Create truck with simplified location (city & state only)
     const truck = await prisma.truck.create({
       data: {
         truckNumber,
@@ -48,7 +49,10 @@ const createTruck = async (req, res) => {
         contactNumber: contactNumber || req.user.mobile,
         status: 'AVAILABLE',
         userId: req.user.id,
-        currentLocation: currentLocation || {},
+        currentLocation: {
+          city: currentLocation?.city || '',
+          state: currentLocation?.state || '',
+        },
       },
       include: {
         user: {
@@ -60,7 +64,6 @@ const createTruck = async (req, res) => {
     });
 
     console.log('✅ Truck created:', truck.id);
-
     success(res, truck, 'Truck created successfully', 201);
   } catch (err) {
     console.error('❌ Create truck error:', err);
@@ -251,10 +254,11 @@ const updateTruck = async (req, res) => {
 const deleteTruck = async (req, res) => {
   try {
     const { id } = req.params;
+    const truckId = parseInt(id);
 
     // Check if truck exists
     const existingTruck = await prisma.truck.findUnique({
-      where: { id: parseInt(id) }
+      where: { id: truckId }
     });
 
     if (!existingTruck) {
@@ -271,19 +275,23 @@ const deleteTruck = async (req, res) => {
       return error(res, 'Only TRUCK_OWNER can delete trucks', 403);
     }
 
-    // Check if truck has bookings
-    const bookings = await prisma.booking.findMany({
-      where: { truckId: parseInt(id) }
+    // Check if truck has active bookings (PENDING, ACCEPTED, IN_TRANSIT)
+    const activeBookings = await prisma.booking.findMany({
+      where: {
+        truckId: truckId,
+        status: { in: ['PENDING', 'ACCEPTED', 'IN_TRANSIT'] }
+      }
     });
 
-    if (bookings.length > 0) {
-      return error(res, 'Cannot delete truck with existing bookings', 400);
+    if (activeBookings.length > 0) {
+      return error(res, 'Cannot delete truck with active bookings', 400);
     }
 
     await prisma.truck.delete({
-      where: { id: parseInt(id) }
+      where: { id: truckId }
     });
 
+    console.log('✅ Truck deleted:', truckId);
     success(res, null, 'Truck deleted successfully');
   } catch (err) {
     console.error('❌ Delete truck error:', err);
@@ -374,8 +382,6 @@ const getAvailableTrucks = async (req, res) => {
 
     // Filter by available routes
     if (pickupCity && dropCity) {
-      // Find trucks that have routes containing both cities
-      // This is a simple approach - you can make it more sophisticated
       where.availableRoutes = {
         hasSome: [pickupCity, dropCity]
       };

@@ -120,6 +120,10 @@ model User {
   shipperBookings Booking[] @relation("ShipperBookings")
   carrierBookings Booking[] @relation("CarrierBookings")
 
+  //  THESE 2 LINES
+  givenReviews    Review[] @relation("GivenReviews")
+  receivedReviews Review[] @relation("ReceivedReviews")
+
   @@index([email])
   @@index([role])
   @@index([businessType])
@@ -255,12 +259,58 @@ model Booking {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
+  // THIS 1 LINE
+  reviews Review[]
+
   @@index([loadId])
   @@index([truckId])
   @@index([shipperId])
   @@index([carrierId])
   @@index([status])
   @@map("bookings")
+}
+
+//i add this part in new 
+// ============================================================
+// REVIEW & RATING (Feedback System)
+// ============================================================
+
+model Review {
+  id      Int     @id @default(autoincrement())
+  rating  Int
+  comment String? @db.Text
+
+  reviewerId Int  @map("reviewer_id")
+  reviewer   User @relation("GivenReviews", fields: [reviewerId], references: [id], onDelete: Cascade)
+
+  revieweeId Int  @map("reviewee_id")
+  reviewee   User @relation("ReceivedReviews", fields: [revieweeId], references: [id], onDelete: Cascade)
+
+  bookingId Int?     @map("booking_id")
+  booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([revieweeId])
+  @@index([reviewerId])
+  @@index([bookingId])
+  @@map("reviews")
+}
+
+// Add to schema.prisma
+model Testimonial {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(100)
+  role      String   @db.VarChar(50)
+  company   String   @db.VarChar(100)
+  content   String   @db.Text
+  rating    Int      @default(5)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("testimonials")
 }
 
 // ============================================================

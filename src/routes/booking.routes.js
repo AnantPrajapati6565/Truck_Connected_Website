@@ -6,14 +6,20 @@ const { auth } = require('../middleware/auth');
 // All booking routes require authentication
 router.use(auth);
 
-// My bookings
+// Get all bookings
+router.get('/', bookingController.getBookings);
+
+// Get my bookings
 router.get('/my/shipper', bookingController.getMyShipperBookings);
 router.get('/my/carrier', bookingController.getMyCarrierBookings);
 
-// CRUD operations
+// Create booking
 router.post('/', bookingController.createBooking);
-router.get('/', bookingController.getBookings);
+
+// Get single booking
 router.get('/:id', bookingController.getBooking);
+
+// Update booking status
 router.patch('/:id/status', bookingController.updateBookingStatus);
 
 module.exports = router;

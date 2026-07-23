@@ -9,20 +9,30 @@ const routes = require('./routes');
 
 const app = express();
 
-// ✅ FIX: Update CORS configuration
+// ✅ FIX: CORS configuration
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000'], // Vite uses 5173
+  origin: ['http://localhost:5173', 'http://localhost:3000'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Cookie'],
+  exposedHeaders: ['Set-Cookie', 'Cookie', 'Access-Control-Allow-Origin'],
 }));
 
 // Middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(morgan('dev'));
+
+// ✅ Debug middleware to log cookies
+app.use((req, res, next) => {
+  console.log('🍪 Request Cookies:', req.cookies);
+  console.log('📋 Request Headers:', req.headers.cookie);
+  next();
+});
 
 // Health check
 app.get('/health', (req, res) => {
